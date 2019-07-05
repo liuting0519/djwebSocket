@@ -1,0 +1,14 @@
+altgraph==0.16.1
+Django==2.0.4
+django-windows-tools==0.2.1
+dwebsocket==0.5.10
+future==0.17.1
+macholib==1.11
+pefile==2019.4.18
+PyInstaller==3.4
+pyserial==3.4
+pytz==2019.1
+pywin32==224
+pywin32-ctypes==0.2.0
+six==1.12.0
+sqlparse==0.3.0

@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,height=device-height">
+    <title>实时更新数据的折线图</title>
+    <style>::-webkit-scrollbar{display:none;}html,body{overflow:hidden;height:100%;margin:0;}
+    </style>
+</head>
+<body>
+{% csrf_token %}
+<div style="margin-left: 50px;margin-top: 10px">
+    <span>串口1:</span>
+    <select name="ComName" id="ComName" style="width:75px" >
+
+    </select>
+    <button type="button" id="open_1">打开</button>
+    <button type="button" id="close_1" disabled>关闭</button>
+    <span>串口2:</span>
+    <select name="ComName2" id="ComName2" style="width:75px" >
+
+    </select>
+    <button type="button" id="open_2">打开</button>
+    <button type="button" id="close_2" disabled>关闭</button>
+    <br>
+    <br>
+    <button type="button" id="connect_websocket">连接socket</button>
+    <button type="button" id="send_message">双通道采集</button>
+    <button type="button" id="">单通道采集</button>
+    <button type="button" id="stop">停止采集</button>
+    <button type="button" id="close_websocket">关闭socket</button>
+    <button type="button" id="ship_counter">定次采集</button>
+    <lable>采集次数:<input type="number" id="number"></lable>
+</div>
+<p style="margin-left: 50px;">数据显示：</p>
+<div>
+    <div style="width: 500px; float: left" id="c1">
+        <div id="mountNode"></div>
+    </div>
+    <div style="width: 500px;float: left" id="c2" >
+        <div id="mountNode_2"></div>
+    </div>
+</div>
+<script>/*Fixing iframe window.innerHeight 0 issue in Safari*/document.body.clientHeight;</script>
+<script src="https://gw.alipayobjects.com/os/antv/pkg/_antv.g2-3.5.1/dist/g2.min.js"></script>
+<script src="http://code.jquery.com/jquery-1.11.1.min.js"></script>
+<script>
+    openSocket();
+    // 打开Socket口连接 获取端口信息  初始化页面配置数据后关闭连接
+    function openSocket() {
+        /*创建socket连接*/
+        var socket = new WebSocket("ws://" + window.location.host + "/port_number");
+        socket.onopen = function () {
+            console.log('WebSocket open');//成功连接上Websocket
+        };
+        var data = [];
+        socket.onmessage = function (e) {
+            var str = excludeSpecial(e.data)
+            data = str.split(',')
+            if (data.length>0) {
+                for (var i = 0; i < data.length; i++) {
+                    $("#ComName").append("<option value=" + data[i] + ">" + data[i] + "</option>")
+                    $("#ComName2").append("<option value=" + data[i] + ">" + data[i] + "</option>")
+                }
+            }
+        }
+        socket.onclose = function () {
+            // 关闭 websocket
+            if (data.length>0) {
+                console.log("连接已关闭...");
+            }
+        };
+    }
+    var data = [];var chart = new G2.Chart({
+        container: 'mountNode',
+        forceFit: true,
+        width : 600, // 指定图表宽度
+        height : 400 // 指定图表高度
+    });chart.source(data, {
+        time: {
+            alias: '时间',
+            tickCount: 10,
+            nice: false
+        },
+        temperature: {
+            alias: '数据',
+            min: 0,
+            type:'linear'
+
+        },
+        type: {
+            type: 'cat'
+        }
+    });chart.line().position('time*temperature').color('type', ['#ff7f0e', '#2ca02c']).shape('smooth').size(2);chart.render();
+    // 角度图表
+    var data_2 = [];var chart_2 = new G2.Chart({
+        container: 'mountNode_2',
+        forceFit: true,
+        width : 600, // 指定图表宽度
+        height : 400 // 指定图表高度
+    });chart_2.source(data_2, {
+        time: {
+            alias: '时间',
+            tickCount: 10,
+            nice: false
+        },
+        temperature: {
+            alias: '数据',
+            min: 0,
+            type:'linear'
+
+        },
+        type: {
+            type: 'cat'
+        }
+    });chart_2.line().position('time*temperature').color('type', ['#DC143C','#4169E1']).shape('smooth').size(2);chart_2.render();
+    var time = 0;
+    // 收发数据
+    $(function () {
+        $('#connect_websocket').click(function () {
+            if (window.s) {
+                window.s.close()
+            }
+            // 创建socket连接
+            var socket = new WebSocket("ws://" + window.location.host + "/echo_two");
+            socket.onopen = function () {
+                console.log('WebSocket open');//成功连接上Websocket
+                alert("连接成功")
+            };
+            socket.onmessage = function (e) {
+                if (e.data == "0"){
+                    alert("串口未打开")
+                }else {
+                    //打印出服务端返回过来的数据
+                    var str = excludeSpecial(e.data)
+                    var data_message =  str.split(',')
+                    console.log('message: ' + data_message);
+                    time=time+1
+                    var temperature1 = e.data
+                    if (data.length >= 300) {
+                        data.shift();
+                        data.shift();
+                    }
+                    if (data_2.length >= 300) {
+                        data_2.shift();
+                        data_2.shift();
+                    }
+                    data.push({
+                        time: time,
+                        temperature: data_message[0],
+                        type: '圈数值1'
+                    });
+                    data.push({
+                        time: time,
+                        temperature: data_message[1],
+                        type: '圈数值2'
+                    });
+                    data_2.push({
+                        time: time,
+                        temperature: data_message[2],
+                        type: '角度分辨率值1'
+                    });
+                    data_2.push({
+                        time: time,
+                        temperature: data_message[3],
+                        type: '角度分辨率值2'
+                    });
+                    chart.changeData(data);
+                    chart_2.changeData(data_2);
+                }
+                //$('#messagecontainer').prepend('<p>' + e.data + '</p>');
+            };
+            // Call onopen directly if socket is already open
+            if (socket.readyState == WebSocket.OPEN) socket.onopen();
+            window.s = socket;
+        });
+        // 采集数据
+        $('#send_message').click(function () {
+
+            //如果未连接到websocket
+            if (!window.s) {
+                alert("websocket未连接.");
+            } else {
+                if($("#ComName").val()!=$("#ComName2").val()) {
+                    var dataMessage = []
+                    dataMessage.push("3A0203A348020E0D0A")
+                    dataMessage.push("3A0103A348020F0D0A")
+                   console.log(dataMessage)
+                    window.s.send(dataMessage);//通过websocket发送数据
+                }else {
+                    alert("COM口相同，无法采集，请切换不同的COM口")
+                }
+            }
+        });
+        //  定次采集
+        $("#ship_counter").click(function () {
+            //如果未连接到websocket
+            if (!window.s) {
+                alert("websocket未连接.");
+            } else {
+                if($("#ComName").val()!=$("#ComName2").val()) {
+                    var dataMessage = []
+                    dataMessage.push("3A0203A348020E0D0A")
+                    dataMessage.push("3A0103A348020F0D0A")
+                    dataMessage.push($("#number").val())
+                    console.log(dataMessage)
+                    window.s.send(dataMessage);//通过websocket发送数据
+                }else {
+                    alert("COM口相同，无法采集，请切换不同的COM口")
+                }
+            }
+        })
+        // 关闭websocket
+        $('#close_websocket').click(function () {
+            if (window.s) {
+                window.s.close();//关闭websocket
+                console.log('websocket已关闭');
+            }
+        });
+    });
+
+    // 通道一串口打开
+    $("#open_1").click(function () {
+        if($("#ComName").val() ==  "" || $("#ComName").val() == undefined || $("#ComName").val() == null){
+            alert("串口获取失败，请重新获取")
+        }else {
+            $.ajax({
+                "type": "POST",
+                "dataType": "json",
+                "url": "/open_serial_1",
+                "data": {"COM1": $("#ComName").val()},
+                "headers": {"X-CSRFtoken": getCookie("csrftoken")},
+                "success": function (data) {
+                    if (data.message == 0) {
+                        alert("串口已打开")
+                        $("#open_1").attr("disabled", "true");
+                        $("#close_1").removeAttr("disabled")
+                    } else {
+                        alert("打开成功")
+                        $("#open_1").attr("disabled", "true");
+                        $("#close_1").removeAttr("disabled")
+                    }
+                }, error: function () {
+                    alert("串口获取失败，请刷新页面")
+                }
+            })
+        }
+    })
+
+    // 通道2串口关闭
+    $("#close_1").click(function () {
+        if($("#ComName").val() ==  "" || $("#ComName").val() == undefined || $("#ComName").val() == null){
+            alert("串口获取失败，请重新获取")
+        }else {
+            $.ajax({
+                "type": "POST",
+                "dataType": "json",
+                "url": "/close_serial_1",
+                "headers": {"X-CSRFtoken": getCookie("csrftoken")},
+                "success": function (data) {
+                    if (data.message == 0) {
+                        alert("串口已关闭")
+                        $("#close_1").attr("disabled", "true");
+                        $("#open_1").removeAttr("disabled")
+                    } else {
+                        alert("关闭成功")
+                        $("#close_1").attr("disabled", "true");
+                        $("#open_1").removeAttr("disabled")
+                    }
+                }, error: function () {
+                    alert("串口获取失败，请刷新页面")
+                }
+            })
+        }
+    })
+
+    // 通道一串口打开
+    $("#open_2").click(function () {
+        if($("#ComName2").val() ==  "" || $("#ComName2").val() == undefined || $("#ComName2").val() == null){
+            alert("串口获取失败，请重新获取")
+        }else {
+            $.ajax({
+                "type": "POST",
+                "dataType": "json",
+                "url": "/open_serial_2",
+                "data": {"COM2": $("#ComName2").val()},
+                "headers": {"X-CSRFtoken": getCookie("csrftoken")},
+                "success": function (data) {
+                    console.log(data.message)
+                    if (data.message == 0) {
+                        alert("串口已打开")
+                        $("#open_2").attr("disabled", "true");
+                        $("#close_2").removeAttr("disabled")
+                    } else {
+                        alert("打开成功")
+                        $("#open_2").attr("disabled", "true");
+                        $("#close_2").removeAttr("disabled")
+                    }
+                }, error: function () {
+                    alert("串口获取失败，请刷新页面")
+                }
+            })
+        }
+    })
+
+    // 通道2串口关闭
+    $("#close_2").click(function () {
+        if($("#ComName").val() ==  "" || $("#ComName").val() == undefined || $("#ComName").val() == null){
+            alert("串口获取失败，请重新获取")
+        }else {
+            $.ajax({
+                "type": "POST",
+                "dataType": "json",
+                "url": "/close_serial_2",
+                "headers": {"X-CSRFtoken": getCookie("csrftoken")},
+                "success": function (data) {
+                    if (data.message == 0) {
+                        alert("串口已关闭")
+                        $("#close_2").attr("disabled", "true");
+                        $("#open_2").removeAttr("disabled")
+                    } else {
+                        alert("串口未打开")
+                        $("#close_2").attr("disabled", "true");
+                        $("#open_2").removeAttr("disabled")
+                    }
+                }, error: function () {
+                    alert("串口获取失败，请刷新页面")
+                }
+            })
+        }
+    })
+
+    // 停止采集
+    $("#stop").click(function () {
+        $.ajax({
+            type:"POST",
+            dataType:"json",
+            url:"/stop",
+            headers:{"X-CSRFtoken": getCookie("csrftoken")},
+            success:function (data) {
+                if (data.message==1){
+                    alert("停止成功")
+                }else {
+                    alert("已经停止")
+                }
+            },error:function () {
+                alert("异常，停止失败，请刷新页面重新操作")
+            }
+
+        })
+    })
+
+    //去掉字符串中的特殊字符
+    var excludeSpecial = function(s) {
+        // 去掉转义字符
+        s = s.replace(/[\'\"\\\/\b\f\n\r\t]/g, '');
+        // 去掉特殊字符
+        s = s.replace(/[\@\#\$\%\^\&\*\{\}\:\"\L\<\>\?]/);
+        // 去掉中括号
+        s=s.replace(/\[|]/g,'')
+        return s;
+    };
+    // Cookie.js
+    function setCookie(name,value,path) {
+        var Days = 2; //此 cookie 将被保存2天
+        var exp  = new Date();    //new Date("December 31, 9998");
+        exp.setTime(exp.getTime() + Days*24*60*60*1000);
+        if((typeof value == "string")&&(value.length > 0)){
+            document.cookie = name + "="+ escape(value) + ";expires=" + exp.toGMTString()+";path=/";
+        }else{
+            var exp = new Date();
+            exp.setTime(exp.getTime() - 1);
+            var cval=getCookie(name);
+            if(cval!=null)
+                document.cookie=name +"="+cval+";expires="+exp.toGMTString()+";path=/";
+        }
+    }function getCookie(name) {
+        // (^| )name=([^;]*)(;|$),match[0]为与整个正则表达式匹配的字符串，match[i]为正则表达式捕获数组相匹配的数组；
+        var arr = document.cookie.match(new RegExp("(^| )"+name+"=([^;]*)(;|$)"));
+        if(arr != null) {
+            return unescape(arr[2]);
+        }
+        return null;
+    }
+</script>
+</body>
+</html>
