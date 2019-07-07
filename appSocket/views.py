@@ -45,7 +45,7 @@ def WriteData(request, ser1, ser2, data2, data3, *args):
                 result = ser1.write(data_2)  # 写数据
                 result2 = ser2.write(data_3)
                 print("写总字节数:", result, result2)
-                time.sleep(0.3)
+                time.sleep(0.1)
         else:
             BOOL = True
             while BOOL:
@@ -54,16 +54,15 @@ def WriteData(request, ser1, ser2, data2, data3, *args):
                 print("xie数据",data2,data3)
                 data_2 = bytes.fromhex(data2)
                 data_3 = bytes.fromhex(data3)
-                print(data2)
                 result = ser1.write(data_2)  # 写数据
                 result2 = ser2.write(data_3)
                 print("写总字节数:", result, result2)
-                time.sleep(0.3)
+                time.sleep(0.1)
     except Exception as e:
         print("异常--", e)
 
 
-# 读数代码本体实现
+
 def ReadData(request, ser, ser2,):
     global STRGLO,BOOL
     BOOL = True
@@ -122,7 +121,7 @@ def DOpenPort(request, data2, data3):
         #判断是否打开成功
         if(ser_1.is_open and ser_2.is_open):
             threading.Thread(target=ReadData, args=(request, ser_1, ser_2,)).start()
-            threading.Thread(target=WriteData, args=(request, ser_1, ser_2, data2, data3,)).start()
+            #threading.Thread(target=WriteData, args=(request, ser_1, ser_2, data2, data3,)).start()
             print("ck", ser_1, ser_2)
         else:
             print("ck", ser_1, ser_2)
